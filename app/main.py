@@ -19,8 +19,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from google_search_agent.agent import root_agent
-
+from .google_search_agent.agent import root_agent
 #
 # ADK Streaming
 #
@@ -79,7 +78,7 @@ async def agent_to_client_messaging(websocket, live_events):
 
             # Read the Content and its first Part
             part: Part = (
-                event.content and event.content.parts and event.content.parts[0]
+                    event.content and event.content.parts and event.content.parts[0]
             )
             if not part or not event.partial:
                 continue
@@ -110,8 +109,7 @@ async def client_to_agent_messaging(websocket, live_request_queue):
 #
 
 app = FastAPI()
-
-STATIC_DIR = Path("static")
+STATIC_DIR = Path("app/static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 

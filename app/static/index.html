@@ -2,104 +2,391 @@
 <html>
   <head>
     <title>ADK Streaming Test</title>
+    <style>
+      :root {
+        --bg-color: #ffffff;
+        --text-color: #000000;
+        --border-color: #000000;
+        --input-bg: #ffffff;
+        --status-connected: #4CAF50;
+        --status-disconnected: #f44336;
+        --status-connecting: #FFA500;
+        --message-bg: #f5f5f5;
+        --message-user-bg: #e3f2fd;
+        --message-error-bg: #ffebee;
+      }
+
+      [data-theme="dark"] {
+        --bg-color: #1a1a1a;
+        --text-color: #ffffff;
+        --border-color: #ffffff;
+        --input-bg: #2d2d2d;
+        --message-bg: #2d2d2d;
+        --message-user-bg: #1a237e;
+        --message-error-bg: #b71c1c;
+      }
+
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        transition: all 0.3s ease;
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+
+      #connectionStatus {
+        position: fixed;
+        top: 10px;
+        right: 50px;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .status-connected { background-color: var(--status-connected); }
+      .status-disconnected { background-color: var(--status-disconnected); }
+      .status-connecting { background-color: var(--status-connecting); }
+
+      #messages {
+        height: 400px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 20px;
+        background-color: var(--bg-color);
+      }
+
+      .message {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 5px;
+        max-width: 80%;
+      }
+
+      .message-user {
+        background-color: var(--message-user-bg);
+        margin-left: auto;
+      }
+
+      .message-bot {
+        background-color: var(--message-bg);
+      }
+
+      .message-error {
+        background-color: var(--message-error-bg);
+        color: var(--text-color);
+      }
+
+      .message-timestamp {
+        font-size: 0.7em;
+        color: #666;
+        margin-top: 5px;
+      }
+
+      #messageForm {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      input[type="text"] {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+      }
+
+      button {
+        padding: 8px 16px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      button:hover:not(:disabled) {
+        opacity: 0.8;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid var(--border-color);
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      #themeToggle {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+      }
+    </style>
   </head>
 
   <body>
+    <div id="connectionStatus">
+      <div class="status-dot"></div>
+      <span>Connecting...</span>
+    </div>
+    <button id="themeToggle" onclick="toggleTheme()">🌙</button>
     <h1>ADK Streaming Test</h1>
-    <div
-      id="messages"
-      style="height: 300px; overflow-y: auto; border: 1px solid black"></div>
-    <br />
+    <div id="messages"></div>
 
     <form id="messageForm">
-      <label for="message">Message:</label>
-      <input type="text" id="message" name="message" />
+      <input type="text" id="message" name="message" placeholder="Type your message..." />
       <button type="submit" id="sendButton" disabled>Send</button>
     </form>
-  </body>
 
-  <script>
-    // Connect the server with a WebSocket connection
-    const sessionId = Math.random().toString().substring(10);
-    const ws_url = "ws://" + window.location.host + "/ws/" + sessionId;
-    let ws = new WebSocket(ws_url);
-
-    // Get DOM elements
-    const messageForm = document.getElementById("messageForm");
-    const messageInput = document.getElementById("message");
-    const messagesDiv = document.getElementById("messages");
-    let currentMessageId = null;
-
-    // WebSocket handlers
-    function addWebSocketHandlers(ws) {
-      ws.onopen = function () {
-        console.log("WebSocket connection opened.");
-        document.getElementById("sendButton").disabled = false;
-        document.getElementById("messages").textContent = "Connection opened";
-        addSubmitHandler(this);
-      };
-
-      ws.onmessage = function (event) {
-        // Parse the incoming message
-        const packet = JSON.parse(event.data);
-        console.log(packet);
-
-        // Check if the turn is complete
-        // if turn complete, add new message
-        if (packet.turn_complete && packet.turn_complete == true) {
-          currentMessageId = null;
-          return;
+    <script>
+      // Theme toggle functionality
+      function toggleTheme() {
+        const body = document.body;
+        const themeToggle = document.getElementById('themeToggle');
+        
+        if (body.getAttribute('data-theme') === 'dark') {
+          body.removeAttribute('data-theme');
+          themeToggle.textContent = '🌙';
+          localStorage.setItem('theme', 'light');
+        } else {
+          body.setAttribute('data-theme', 'dark');
+          themeToggle.textContent = '☀️';
+          localStorage.setItem('theme', 'dark');
         }
+      }
 
-        // add a new message for a new turn
-        if (currentMessageId == null) {
-          currentMessageId = Math.random().toString(36).substring(7);
-          const message = document.createElement("p");
-          message.id = currentMessageId;
-          // Append the message element to the messagesDiv
-          messagesDiv.appendChild(message);
-        }
+      // Check for saved theme preference
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.body.setAttribute('data-theme', 'dark');
+        document.getElementById('themeToggle').textContent = '☀️';
+      }
 
-        // Add message text to the existing message element
-        const message = document.getElementById(currentMessageId);
-        message.textContent += packet.message;
+      // Message queue for offline messages
+      const messageQueue = [];
+      let isProcessingQueue = false;
 
-        // Scroll down to the bottom of the messagesDiv
+      // WebSocket connection management
+      const MAX_RECONNECT_ATTEMPTS = 5;
+      const RECONNECT_INTERVAL = 5000;
+      const HEARTBEAT_INTERVAL = 30000;
+      
+      let ws = null;
+      let reconnectAttempts = 0;
+      let heartbeatInterval = null;
+      let isConnecting = false;
+      let currentMessageId = null;
+
+      function updateConnectionStatus(status, message) {
+        const statusDiv = document.getElementById('connectionStatus');
+        const statusDot = statusDiv.querySelector('.status-dot');
+        const statusText = statusDiv.querySelector('span');
+        
+        statusDot.className = 'status-dot status-' + status;
+        statusText.textContent = message;
+      }
+
+      function formatTimestamp() {
+        return new Date().toLocaleTimeString();
+      }
+
+      function createMessageElement(content, type = 'bot') {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message message-${type}`;
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.textContent = content;
+        messageDiv.appendChild(contentDiv);
+        
+        const timestampDiv = document.createElement('div');
+        timestampDiv.className = 'message-timestamp';
+        timestampDiv.textContent = formatTimestamp();
+        messageDiv.appendChild(timestampDiv);
+        
+        return messageDiv;
+      }
+
+      function addMessage(content, type = 'bot') {
+        const messagesDiv = document.getElementById('messages');
+        const messageElement = createMessageElement(content, type);
+        messagesDiv.appendChild(messageElement);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-      };
+      }
 
-      // When the connection is closed, try reconnecting
-      ws.onclose = function () {
-        console.log("WebSocket connection closed.");
-        document.getElementById("sendButton").disabled = true;
-        document.getElementById("messages").textContent = "Connection closed";
-        setTimeout(function () {
-          console.log("Reconnecting...");
+      function processMessageQueue() {
+        if (isProcessingQueue || messageQueue.length === 0) return;
+        
+        isProcessingQueue = true;
+        const message = messageQueue.shift();
+        
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+          isProcessingQueue = false;
+          if (messageQueue.length > 0) {
+            processMessageQueue();
+          }
+        } else {
+          messageQueue.unshift(message);
+          isProcessingQueue = false;
+        }
+      }
+
+      function connectWebSocket() {
+        if (isConnecting) return;
+        isConnecting = true;
+        updateConnectionStatus('connecting', 'Connecting...');
+
+        const sessionId = Math.random().toString().substring(10);
+        const ws_url = "ws://" + window.location.host + "/ws/" + sessionId;
+        
+        try {
           ws = new WebSocket(ws_url);
           addWebSocketHandlers(ws);
-        }, 5000);
-      };
-
-      ws.onerror = function (e) {
-        console.log("WebSocket error: ", e);
-      };
-    }
-    addWebSocketHandlers(ws);
-
-    // Add submit handler to the form
-    function addSubmitHandler(ws) {
-      messageForm.onsubmit = function (e) {
-        e.preventDefault();
-        const message = messageInput.value;
-        if (message) {
-          const p = document.createElement("p");
-          p.textContent = "> " + message;
-          messagesDiv.appendChild(p);
-          ws.send(message);
-          messageInput.value = "";
+        } catch (error) {
+          console.error("WebSocket connection error:", error);
+          handleReconnect();
         }
-        return false;
-      };
-    }
-  </script>
+      }
+
+      function startHeartbeat() {
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+        heartbeatInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, HEARTBEAT_INTERVAL);
+      }
+
+      function handleReconnect() {
+        isConnecting = false;
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts++;
+          updateConnectionStatus('connecting', `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+          setTimeout(connectWebSocket, RECONNECT_INTERVAL);
+        } else {
+          updateConnectionStatus('disconnected', 'Connection failed');
+          addMessage('Connection failed after multiple attempts. Please refresh the page.', 'error');
+          document.getElementById("sendButton").disabled = true;
+        }
+      }
+
+      function addWebSocketHandlers(ws) {
+        ws.onopen = function () {
+          console.log("WebSocket connection opened.");
+          isConnecting = false;
+          reconnectAttempts = 0;
+          document.getElementById("sendButton").disabled = false;
+          updateConnectionStatus('connected', 'Connected');
+          addSubmitHandler(this);
+          startHeartbeat();
+          processMessageQueue();
+        };
+
+        ws.onmessage = function (event) {
+          try {
+            const packet = JSON.parse(event.data);
+            console.log(packet);
+
+            if (packet.type === 'pong') {
+              return;
+            }
+
+            if (packet.turn_complete && packet.turn_complete == true) {
+              currentMessageId = null;
+              return;
+            }
+
+            if (currentMessageId == null) {
+              currentMessageId = Math.random().toString(36).substring(7);
+              addMessage(packet.message);
+            } else {
+              const lastMessage = document.querySelector('.message:last-child div:first-child');
+              if (lastMessage) {
+                lastMessage.textContent += packet.message;
+              }
+            }
+          } catch (error) {
+            console.error("Error processing message:", error);
+            addMessage('Error processing message', 'error');
+          }
+        };
+
+        ws.onclose = function (event) {
+          console.log("WebSocket connection closed:", event.code, event.reason);
+          document.getElementById("sendButton").disabled = true;
+          
+          if (event.reason && event.reason.includes("quota")) {
+            updateConnectionStatus('disconnected', 'Quota exceeded');
+            addMessage('Service temporarily unavailable: API quota exceeded. Please try again later.', 'error');
+          } else if (event.code === 1011) {
+            updateConnectionStatus('disconnected', 'Service error');
+            addMessage('Service error occurred. Please try again later.', 'error');
+          } else {
+            updateConnectionStatus('disconnected', 'Disconnected');
+            addMessage('Connection closed. Attempting to reconnect...', 'error');
+          }
+          
+          if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+          }
+          
+          handleReconnect();
+        };
+
+        ws.onerror = function (error) {
+          console.error("WebSocket error:", error);
+        };
+      }
+
+      // Initial connection
+      connectWebSocket();
+
+      // Add submit handler to the form
+      function addSubmitHandler(ws) {
+        messageForm.onsubmit = function (e) {
+          e.preventDefault();
+          const message = messageInput.value;
+          if (message) {
+            addMessage(message, 'user');
+            messageInput.value = "";
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(message);
+            } else {
+              messageQueue.push(message);
+              addMessage('Message queued. Will send when reconnected.', 'error');
+            }
+          }
+          return false;
+        };
+      }
+    </script>
+  </body>
 </html>
